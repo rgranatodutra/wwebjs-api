@@ -42,8 +42,8 @@ async function parseMessage({ message, instance, clientId, phone }: ParseMessage
     instance,
     clientId,
     wwebjsIdStanza: message.key.id || null,
-    from: isFromMe ? phone : remotePhone,
-    to: isFromMe ? remotePhone : phone,
+    from: isFromMe ? `me:${phone}` : remotePhone,
+    to: isFromMe ? remotePhone : `me:${phone}`,
     isForwarded,
     status: isFromMe ? "PENDING" : "RECEIVED",
     sentAt: messageSentAt,
@@ -62,11 +62,21 @@ async function parseMessage({ message, instance, clientId, phone }: ParseMessage
 }
 
 function getMessageContent(message: WAMessage): MessageContent | FileMessageContent {
+  Logger.debug("Getting message content", message);
   const messageBase: BaseMessageContent = {
     contactName: getMessageContactName(message),
     timestamp: String(message.messageTimestamp),
     quotedMessageId: getMessageQuotedId(message),
   };
+
+  if (message.message?.extendedTextMessage?.text) {
+    return {
+      ...messageBase,
+      type: "chat",
+      body: message.message.extendedTextMessage.text,
+      isFile: false,
+    };
+  }
 
   if (message.message?.conversation) {
     return {

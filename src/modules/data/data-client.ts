@@ -1,9 +1,11 @@
 import { proto, type AuthenticationState, type GroupMetadata, type SignalKeyStore, type WAMessageKey } from "baileys";
+import { FullRawMessage } from "../whatsapp/clients/baileys-client/types";
 
 abstract class DataClient {
   public abstract getSignalKeyStore(sessionId: string): Promise<SignalKeyStore>;
   public abstract getGroupMetadata(sessionId: string, jid: string): Promise<GroupMetadata | undefined>;
   public abstract getRawMessage(sessionId: string, key: WAMessageKey): Promise<proto.IMessage | undefined>;
+  public abstract getFullRawMessage(sessionId: string, messageId: string): Promise<FullRawMessage | null>;
   public abstract saveRawMessage(sessionId: string, message: proto.IMessage, key: WAMessageKey): Promise<void>;
   public abstract getAuthState(sessionId: string): Promise<AuthenticationState>;
   public abstract saveAuthState(sessionId: string): Promise<void>;

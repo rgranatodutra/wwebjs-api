@@ -12,6 +12,7 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import { createPool } from "mysql2/promise";
 import type DataClient from "./data-client.js";
 import { Logger } from "@in.pulse-crm/utils";
+import { FullRawMessage, FullRawMessageJson } from "../whatsapp/clients/baileys-client/types.js";
 
 type MySQLAuthState = Awaited<ReturnType<typeof useMySQLAuthState>>;
 
@@ -66,17 +67,37 @@ class MySQLDataClient implements DataClient {
     return undefined;
   }
 
-  public async getRawMessage(sessionId: string, key: WAMessageKey): Promise<proto.IMessage | undefined> {
+  public async getFullRawMessage(sessionId: string, messageId: string): Promise<FullRawMessage | null> {
     try {
-      const query = "SELECT message_data FROM raw_messages WHERE id = ? AND session_id = ?";
-      const [rows] = await this.pool.query<RowDataPacket[]>(query, [key.id, sessionId]);
+      const query = "SELECT * FROM raw_messages WHERE id = ? AND session_id = ?";
+      const [rows] = await this.pool.query<RowDataPacket[]>(query, [messageId, sessionId]);
 
       if (rows[0]) {
-        const messageData = rows[0]["message_data"];
-        return typeof messageData === "string" ? JSON.parse(messageData) : messageData;
+        const resultJson = rows[0] as FullRawMessageJson;
+        const resultParsed: FullRawMessage = {
+          ...resultJson,
+          message_data: JSON.parse(resultJson.message_data) as proto.IMessage,
+          key_data: JSON.parse(resultJson.key_data) as proto.IMessageKey,
+          created_at: new Date(resultJson.created_at),
+          updated_at: new Date(resultJson.updated_at),
+        };
+        return resultParsed;
       }
 
-      return undefined;
+      return null;
+    } catch (error: any) {
+      Logger.error("Error fetching message from MySQL", error);
+      return null;
+    }
+  }
+
+  public async getRawMessage(sessionId: string, key: WAMessageKey): Promise<proto.IMessage | undefined> {
+    try {
+      if (!key.id) {
+        return undefined;
+      }
+      const findMessage = await this.getFullRawMessage(sessionId, key.id!);
+      return findMessage?.message_data;
     } catch (error: any) {
       return undefined;
     }

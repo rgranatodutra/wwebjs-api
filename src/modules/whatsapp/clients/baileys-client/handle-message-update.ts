@@ -10,22 +10,16 @@ interface MessageUpdateContext {
 }
 
 async function handleMessageUpdate({ client, logger, updates }: MessageUpdateContext) {
-  try {
-    logger.log(`Received messages update`, { updateCount: updates.length });
+  logger.log(`Received messages update`, { updateCount: updates.length });
 
-    for (const update of updates) {
-      if (!!update.update.status) {
-        logger.log("Processing message status update", { messageId: update.key.id, status: update.update.status });
-        await handleMessageAck({ client, ack: update.update.status, logger, msgId: update.key.id! });
-      }
+  for (const update of updates) {
+    if (!!update.update.status) {
+      logger.log("Processing message status update", { messageId: update.key.id, status: update.update.status });
+      await handleMessageAck({ client, ack: update.update.status, logger, msgId: update.key.id! });
     }
-
-    logger.success({ processedUpdates: updates.length });
-  } catch (error) {
-    logger.log("Error processing messages update", error as Error);
-    logger.failed(error);
-    throw error;
   }
+
+  logger.success({ processedUpdates: updates.length });
 }
 
 export default handleMessageUpdate;

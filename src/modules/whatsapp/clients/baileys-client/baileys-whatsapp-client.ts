@@ -1,19 +1,16 @@
-import makeWASocket, {
-  DisconnectReason,
-  MessageUpsertType,
-  WAMessage,
-  WAMessageUpdate,
-  type ConnectionState,
-} from "baileys";
+import makeWASocket, { MessageUpsertType, WAMessage, WAMessageUpdate, type ConnectionState } from "baileys";
 import ProcessingLogger from "../../../../utils/processing-logger";
 import type DataClient from "../../../data/data-client";
 import WppEventEmitter from "../../../events/emitter/emitter";
 import type MessageDto from "../../types";
 import type { EditMessageOptions, SendMessageOptions } from "../../types";
 import WhatsappClient from "../whatsapp-client";
+import handleConnectionUpdate from "./handle-connection-update";
 import handleMessageUpdate from "./handle-message-update";
 import handleMessageUpsert from "./handle-message-upsert";
+import handleSendMessage from "./handle-send-message";
 import makeNewSocket from "./make-new-socket";
+import handleEditMessage from "./handle-edit-message";
 
 class BaileysWhatsappClient implements WhatsappClient {
   public _phone: string = "";
@@ -53,69 +50,38 @@ class BaileysWhatsappClient implements WhatsappClient {
   }
 
   private async onConnectionUpdate(update: Partial<ConnectionState>) {
-    const logger = this.getLogger("Connection Update", `conn-update-${Date.now()}`, update);
-    logger?.log("Connection update received", update);
-
-    if (update.qr) {
-      this._ev.emit({
-        type: "qr-received",
-        clientId: this.clientId,
-        qr: update.qr,
-      });
-
-      logger?.log("QR code generated for connection");
-    }
-
-    if (update.connection === "open") {
-      logger.log("Connection opened successfully");
-      const sevenDays = 7 * 24 * 60 * 60 * 1000;
-      const sevenDaysAgo = new Date(Date.now() - sevenDays);
-      this._sock.fetchMessageHistory(10, {}, sevenDaysAgo.getTime());
-      this._phone = this._sock.user?.id.split(":")[0] || "";
-
-      this._ev.emit({
-        type: "auth-success",
-        clientId: this.clientId,
-        phoneNumber: this._phone,
-      });
-    }
-
-    const errStatusCode = (update.lastDisconnect?.error as any)?.output?.statusCode;
-    const isRestartRequired = errStatusCode === DisconnectReason.restartRequired;
-
-    if (update.connection === "close" && isRestartRequired) {
-      logger?.log("Socket restart required, reinitializing...");
-      this._sock = await makeNewSocket(this.sessionId, this._storage);
-      this.bindEvents();
-      logger?.log("Socket reinitialized successfully");
-    }
-    if (update.connection === "close" && !isRestartRequired) {
-      this._storage.clearAuthState(this.sessionId);
-      logger?.log("Logged out, cleared auth state from storage");
-      this._sock = await makeNewSocket(this.sessionId, this._storage);
-      this.bindEvents();
-      logger?.log("Socket reinitialized after logout");
+    const processId = `conn-update-${Date.now()}`;
+    const logger = this.getLogger("Connection Update", processId, update);
+    try {
+      await handleConnectionUpdate({ update, client: this, logger });
+    } catch (error) {
+      logger.failed(error);
     }
   }
 
   private async onMessagesUpsert({ messages, type }: { messages: WAMessage[]; type: MessageUpsertType }) {
     const processId = `messages-upsert-${Date.now()}`;
     const logger = this.getLogger("Messages Upsert", processId, { type, messageCount: messages.length });
-
-    await handleMessageUpsert({ messages, type, client: this, logger });
+    try {
+      await handleMessageUpsert({ messages, type, client: this, logger });
+    } catch (error) {
+      logger.failed(error);
+    }
   }
 
   private async onMessagesUpdate(updates: WAMessageUpdate[]) {
     const processId = `messages-update-${Date.now()}`;
     const logger = this.getLogger("Messages Update", processId, { updateCount: updates.length });
-
-    await handleMessageUpdate({ updates, client: this, logger });
+    try {
+      await handleMessageUpdate({ updates, client: this, logger });
+    } catch (error) {
+      logger.failed(error);
+    }
   }
 
   private async onHistorySet({ messages }: { messages: WAMessage[] }) {
     const processId = `history-set-${Date.now()}`;
     const logger = this.getLogger("History Set", processId, { messageCount: messages.length }, true);
-
     try {
       logger.log(`Received messaging history set`, { messageCount: messages.length });
 
@@ -130,7 +96,6 @@ class BaileysWhatsappClient implements WhatsappClient {
       logger.success({ savedMessages: messages.length });
     } catch (error) {
       logger.failed(error);
-      throw error;
     }
   }
 
@@ -142,28 +107,52 @@ class BaileysWhatsappClient implements WhatsappClient {
     throw new Error("Method not implemented.");
   }
 
-  public sendMessage(props: SendMessageOptions, isGroup?: boolean): Promise<MessageDto> {
+  public async sendMessage(props: SendMessageOptions, isGroup: boolean = false): Promise<MessageDto> {
     const processId = `send-message-${Date.now()}`;
     const logger = this.getLogger("Send Message", processId, { props, isGroup });
-
-    logger.log(`Sending message to ${isGroup ? "group" : "individual"}: ${props.to}`, props);
-    throw new Error("Method not implemented.");
+    try {
+      return await handleSendMessage({ client: this, options: props, isGroup, logger });
+    } catch (error) {
+      logger.failed(error);
+      throw error;
+    }
   }
 
-  public editMessage(props: EditMessageOptions): Promise<void> {
+  public async editMessage(props: EditMessageOptions): Promise<MessageDto> {
     const processId = `edit-message-${Date.now()}`;
     const logger = this.getLogger("Edit Message", processId, { props });
-
-    logger.log(`Editing message with ID: ${props.messageId}`, props);
-    throw new Error("Method not implemented.");
+    try {
+      return await handleEditMessage({ client: this, options: props, logger });
+    } catch (error) {
+      logger.failed(error);
+      throw error;
+    }
   }
 
-  public getAvatarUrl(phone: string): Promise<string | null> {
+  public async getAvatarUrl(phone: string): Promise<string | null> {
     const processId = `get-avatar-${Date.now()}`;
     const logger = this.getLogger("Get Avatar URL", processId, { phone });
 
-    logger.log(`Getting avatar URL for phone number: ${phone}`);
-    throw new Error("Method not implemented.");
+    try {
+      logger.log(`Getting avatar URL for phone number: ${phone}`);
+
+      // Normalize phone to JID format
+      const cleanPhone = phone.replace("@s.whatsapp.net", "").trim();
+      if (!cleanPhone || !/^\d+$/.test(cleanPhone)) {
+        throw new Error(`Invalid phone number format: ${phone}`);
+      }
+
+      const jid = `${cleanPhone}@s.whatsapp.net`;
+
+      // Get avatar URL from socket
+      const avatarUrl = await this._sock.profilePictureUrl(jid, "image");
+
+      logger.success(`Avatar URL retrieved: ${avatarUrl}`);
+      return avatarUrl || null;
+    } catch (error) {
+      logger.failed(`Failed to get avatar URL: ${error}`);
+      return null;
+    }
   }
 
   get phone(): string {

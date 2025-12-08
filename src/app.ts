@@ -1,10 +1,12 @@
-import { Logger } from "@in.pulse-crm/utils";
+import ExpressApi from "./api";
 import MySQLDataClient from "./modules/data/mysql-data-client";
 import HttpWppEventEmitter from "./modules/events/emitter/http-emitter";
 import BaileysWhatsappClient from "./modules/whatsapp/clients/baileys-client/baileys-whatsapp-client";
-import "dotenv/config";
+import { config } from "dotenv";
 
 async function runApp() {
+  config();
+
   const endpoints = process.env["WPP_EVENT_ENDPOINTS"]?.split(",");
   const mysqlHost = process.env["MYSQL_HOST"] || "localhost";
   const mysqlPort = parseInt(process.env["MYSQL_PORT"] || "3306", 10);
@@ -15,6 +17,7 @@ async function runApp() {
   const clientId = process.env["CLIENT_ID"] ? parseInt(process.env["CLIENT_ID"], 10) : null;
   const sessionId =
     process.env["SESSION_ID"] || (instanceName && clientId !== null ? `${instanceName}-${clientId}` : null);
+  const listenPort = parseInt(process.env["API_LISTEN_PORT"] || "727", 10);
 
   if (!mysqlUser || !mysqlPassword) {
     throw new Error("MYSQL_USER or MYSQL_PASSWORD environment variable is not set");
@@ -36,13 +39,14 @@ async function runApp() {
     throw new Error("SESSION_ID environment variable is not set and cannot be derived");
   }
 
-  const storageClient = new MySQLDataClient(mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlDatabase);
   const eventEmitter = new HttpWppEventEmitter(endpoints);
-  await BaileysWhatsappClient.build(sessionId, clientId, instanceName, storageClient, eventEmitter);
-
-  Logger.info("WhatsApp client initialized successfully. Client ID: " + clientId);
+  const dbClient = new MySQLDataClient(mysqlHost, mysqlPort, mysqlUser, mysqlPassword, mysqlDatabase);
+  const wppClient = await BaileysWhatsappClient.build(sessionId, clientId, instanceName, dbClient, eventEmitter);
+  const api = ExpressApi.create(wppClient);
+  api.listen(listenPort);
 }
 
 runApp().catch((error) => {
-  console.error("Error running app:", error);
+  console.error("Failed to start application:", error);
+  process.exit(1);
 });
