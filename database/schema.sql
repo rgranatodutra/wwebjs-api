@@ -1,0 +1,58 @@
+-- Schema para a tabela raw_messages
+CREATE TABLE IF NOT EXISTS raw_messages (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(255) NOT NULL,
+    remote_jid VARCHAR(255),
+    message_id VARCHAR(255),
+    from_me BOOLEAN DEFAULT FALSE,
+    key_data LONGTEXT NOT NULL,
+    message_data LONGTEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_message (session_id, remote_jid, message_id, from_me),
+    INDEX idx_session_id (session_id),
+    INDEX idx_remote_jid (remote_jid),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Schema para a tabela processing_logs
+CREATE TABLE IF NOT EXISTS processing_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    instance VARCHAR(255) NOT NULL,
+    process_name VARCHAR(255) NOT NULL,
+    process_id VARCHAR(255) NOT NULL UNIQUE,
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    duration_ms BIGINT NOT NULL,
+    log_entries LONGTEXT NOT NULL,
+    input LONGTEXT,
+    output LONGTEXT,
+    has_error BOOLEAN DEFAULT FALSE,
+    error LONGTEXT,
+    error_message VARCHAR(1024),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_instance (instance),
+    INDEX idx_process_name (process_name),
+    INDEX idx_process_id (process_id),
+    INDEX idx_start_time (start_time),
+    INDEX idx_has_error (has_error),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Schema para a tabela log_entries
+CREATE TABLE IF NOT EXISTS log_entries (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    processing_log_id BIGINT NOT NULL,
+    process_id VARCHAR(255) NOT NULL,
+    log_message VARCHAR(1024) NOT NULL,
+    log_level ENUM('INFO', 'DEBUG', 'ERROR') NOT NULL,
+    log_data LONGTEXT,
+    created_at DATETIME NOT NULL,
+    INDEX idx_processing_log_id (processing_log_id),
+    INDEX idx_process_id (process_id),
+    INDEX idx_log_level (log_level),
+    INDEX idx_created_at (created_at),
+    CONSTRAINT fk_processing_log_id FOREIGN KEY (processing_log_id) 
+        REFERENCES processing_logs(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
