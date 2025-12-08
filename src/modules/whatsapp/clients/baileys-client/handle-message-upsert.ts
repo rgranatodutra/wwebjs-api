@@ -35,6 +35,12 @@ async function handleMessageUpsert({ messages, type, client, logger }: MessageUp
         });
 
         logger.log("Message parsed successfully", { parsedMessage });
+        client._ev.emit({
+          type: "message-received",
+          clientId: client.clientId,
+          message: parsedMessage,
+        });
+        logger.log("Emitted message-received event", { messageId: message.key?.id });
       }
     }
 

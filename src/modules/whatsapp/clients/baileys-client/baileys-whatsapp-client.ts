@@ -1,13 +1,10 @@
 import makeWASocket, {
-  Browsers,
   DisconnectReason,
-  makeCacheableSignalKeyStore,
   MessageUpsertType,
   WAMessage,
   WAMessageUpdate,
   type ConnectionState,
 } from "baileys";
-import type { ILogger } from "baileys/lib/Utils/logger";
 import ProcessingLogger from "../../../../utils/processing-logger";
 import type DataClient from "../../../data/data-client";
 import WppEventEmitter from "../../../events/emitter/emitter";
@@ -16,16 +13,17 @@ import type { EditMessageOptions, SendMessageOptions } from "../../types";
 import WhatsappClient from "../whatsapp-client";
 import handleMessageUpdate from "./handle-message-update";
 import handleMessageUpsert from "./handle-message-upsert";
+import makeNewSocket from "./make-new-socket";
 
 class BaileysWhatsappClient implements WhatsappClient {
-  private _phone: string = "";
+  public _phone: string = "";
 
   constructor(
-    public readonly sessionId: string,
-    public readonly clientId: number,
-    public readonly instance: string,
-    public readonly _storage: DataClient,
-    private _sock: ReturnType<typeof makeWASocket>,
+    public sessionId: string,
+    public clientId: number,
+    public instance: string,
+    public _storage: DataClient,
+    public _sock: ReturnType<typeof makeWASocket>,
     public _ev: WppEventEmitter,
   ) {}
 
@@ -36,44 +34,13 @@ class BaileysWhatsappClient implements WhatsappClient {
     storage: DataClient,
     eventEmitter: WppEventEmitter,
   ): Promise<BaileysWhatsappClient> {
-    const socket = await BaileysWhatsappClient.makeNewSocket(sessionId, storage);
-
+    const socket = await makeNewSocket(sessionId, storage);
     const client = new BaileysWhatsappClient(sessionId, clientId, instance, storage, socket, eventEmitter);
     client.bindEvents();
     return client;
   }
 
-  private static async makeNewSocket(id: string, storage: DataClient) {
-    const logger: ILogger = {
-      level: "info",
-      error: (msg) => console.log(`[ERROR] ${msg}`),
-      warn: (msg) => console.log(`[WARN] ${msg}`),
-      info: (msg) => console.log(`[INFO] ${msg}`),
-      child: (msg) => {
-        console.log(`[CHILD LOGGER] ${msg}`);
-        return logger;
-      },
-      debug: () => {},
-      trace: () => {},
-    };
-
-    const authState = await storage.getAuthState(id);
-    const signalStore = await storage.getSignalKeyStore(id);
-    const socket = makeWASocket({
-      logger,
-      auth: {
-        creds: authState.creds,
-        keys: makeCacheableSignalKeyStore(signalStore, logger),
-      },
-      browser: Browsers.windows("Google Chrome"),
-      cachedGroupMetadata: async (jid) => storage.getGroupMetadata(id, jid),
-      getMessage: async (key) => storage.getRawMessage(id, key),
-    });
-
-    return socket;
-  }
-
-  private bindEvents() {
+  public bindEvents() {
     this._sock.ev.on("connection.update", this.onConnectionUpdate.bind(this));
     this._sock.ev.on("creds.update", this._storage.saveAuthState.bind(this._storage, this.sessionId));
     this._sock.ev.on("messages.upsert", this.onMessagesUpsert.bind(this));
@@ -118,14 +85,14 @@ class BaileysWhatsappClient implements WhatsappClient {
 
     if (update.connection === "close" && isRestartRequired) {
       logger?.log("Socket restart required, reinitializing...");
-      this._sock = await BaileysWhatsappClient.makeNewSocket(this.sessionId, this._storage);
+      this._sock = await makeNewSocket(this.sessionId, this._storage);
       this.bindEvents();
       logger?.log("Socket reinitialized successfully");
     }
     if (update.connection === "close" && !isRestartRequired) {
       this._storage.clearAuthState(this.sessionId);
       logger?.log("Logged out, cleared auth state from storage");
-      this._sock = await BaileysWhatsappClient.makeNewSocket(this.sessionId, this._storage);
+      this._sock = await makeNewSocket(this.sessionId, this._storage);
       this.bindEvents();
       logger?.log("Socket reinitialized after logout");
     }

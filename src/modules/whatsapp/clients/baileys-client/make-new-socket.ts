@@ -1,0 +1,35 @@
+import { ILogger } from "baileys/lib/Utils/logger";
+import DataClient from "../../../data/data-client";
+import makeWASocket, { Browsers, makeCacheableSignalKeyStore } from "baileys";
+
+async function makeNewSocket(id: string, storage: DataClient) {
+  const logger: ILogger = {
+    level: "info",
+    error: (msg) => console.log(`[ERROR]`, msg),
+    warn: (msg) => console.log(`[WARN]`, msg),
+    info: (msg) => console.log(`[INFO]`, msg),
+    child: (msg) => {
+      console.log(`[CHILD LOGGER]`, msg);
+      return logger;
+    },
+    debug: () => {},
+    trace: () => {},
+  };
+
+  const authState = await storage.getAuthState(id);
+  const signalStore = await storage.getSignalKeyStore(id);
+  const socket = makeWASocket({
+    logger,
+    auth: {
+      creds: authState.creds,
+      keys: makeCacheableSignalKeyStore(signalStore, logger),
+    },
+    browser: Browsers.windows("Google Chrome"),
+    cachedGroupMetadata: async (jid) => storage.getGroupMetadata(id, jid),
+    getMessage: async (key) => storage.getRawMessage(id, key),
+  });
+
+  return socket;
+}
+
+export default makeNewSocket;

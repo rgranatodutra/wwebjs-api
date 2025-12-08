@@ -12,7 +12,13 @@ interface MessageAckContext {
 async function handleMessageAck({ client, logger, msgId, ack }: MessageAckContext) {
   const status = parseAck(ack);
   logger.log(`Message with ID ${msgId} updated with status: ${status}`);
-  client._ev.emit({ type: "message-status-received", messageId: msgId, status, timestamp: Date.now() });
+  client._ev.emit({
+    type: "message-status-received",
+    clientId: client.clientId,
+    messageId: msgId,
+    status,
+    timestamp: Date.now(),
+  });
 }
 
 export default handleMessageAck;

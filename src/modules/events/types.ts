@@ -14,11 +14,13 @@ export interface AuthSuccessEvent {
 
 export interface MessageReceivedEvent {
   type: "message-received";
+  clientId: number;
   message: MessageDto;
 }
 
 export interface MessageStatusReceivedEvent {
   type: "message-status-received";
+  clientId: number;
   messageId: string;
   status: string;
   timestamp: number;

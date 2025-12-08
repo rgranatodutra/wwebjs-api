@@ -2,6 +2,7 @@ import { Logger } from "@in.pulse-crm/utils";
 import MySQLDataClient from "./modules/data/mysql-data-client";
 import HttpWppEventEmitter from "./modules/events/emitter/http-emitter";
 import BaileysWhatsappClient from "./modules/whatsapp/clients/baileys-client/baileys-whatsapp-client";
+import "dotenv/config";
 
 async function runApp() {
   const endpoints = process.env["WPP_EVENT_ENDPOINTS"]?.split(",");
