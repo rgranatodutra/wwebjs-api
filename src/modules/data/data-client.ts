@@ -1,6 +1,6 @@
 import { proto, type AuthenticationState, type GroupMetadata, type SignalKeyStore, type WAMessageKey } from "baileys";
 
-abstract class StorageClient {
+abstract class DataClient {
   public abstract getSignalKeyStore(sessionId: string): Promise<SignalKeyStore>;
   public abstract getGroupMetadata(sessionId: string, jid: string): Promise<GroupMetadata | undefined>;
   public abstract getRawMessage(sessionId: string, key: WAMessageKey): Promise<proto.IMessage | undefined>;
@@ -11,4 +11,4 @@ abstract class StorageClient {
   public abstract unsafeQuery<T>(query: string, params?: any[]): Promise<T[]>;
 }
 
-export default StorageClient;
+export default DataClient;

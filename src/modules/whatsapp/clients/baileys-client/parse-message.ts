@@ -1,6 +1,6 @@
 import { downloadMediaMessage, WAMessage, WAMessageKey } from "baileys";
-import MessageDto from "../types";
-import filesService from "../../services/files.service";
+import MessageDto from "../../types";
+import filesService from "../../../files/files.service";
 import { FileDirType } from "@in.pulse-crm/sdk";
 import { Logger } from "@in.pulse-crm/utils";
 

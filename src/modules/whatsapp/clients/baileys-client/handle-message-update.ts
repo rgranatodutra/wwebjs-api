@@ -1,5 +1,5 @@
 import { WAMessageUpdate } from "baileys";
-import ProcessingLogger from "../../utils/processing-logger";
+import ProcessingLogger from "../../../../utils/processing-logger";
 import BaileysWhatsappClient from "./baileys-whatsapp-client";
 import handleMessageAck from "./handle-message-ack";
 

@@ -1,5 +1,5 @@
 import { Logger, sanitizeErrorMessage } from "@in.pulse-crm/utils";
-import StorageClient from "../storage/storage-client";
+import DataClient from "../modules/data/data-client";
 
 interface LogEntry {
   timestamp: string;
@@ -16,7 +16,7 @@ export default class ProcessingLogger {
   private error: unknown = null;
 
   constructor(
-    private readonly storage: StorageClient,
+    private readonly storage: DataClient,
     private readonly instance: string,
     public processName: string,
     private readonly processId: string,

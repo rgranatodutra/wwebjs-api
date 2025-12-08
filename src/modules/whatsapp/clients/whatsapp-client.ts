@@ -1,0 +1,13 @@
+import type MessageDto from "../types";
+import type { EditMessageOptions, SendMessageOptions } from "../types";
+
+abstract class WhatsappClient {
+  public abstract readonly sessionId: string;
+
+  public abstract isValidWhatsapp(phone: string): Promise<boolean>;
+  public abstract sendMessage(props: SendMessageOptions, isGroup?: boolean): Promise<MessageDto>;
+  public abstract editMessage(props: EditMessageOptions): Promise<void>;
+  public abstract getAvatarUrl(phone: string): Promise<string | null>;
+}
+
+export default WhatsappClient;

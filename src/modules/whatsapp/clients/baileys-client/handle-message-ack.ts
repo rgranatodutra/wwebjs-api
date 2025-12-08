@@ -1,4 +1,4 @@
-import ProcessingLogger from "../../utils/processing-logger";
+import ProcessingLogger from "../../../../utils/processing-logger";
 import parseAck from "./parse-ack";
 
 interface MessageAckContext {

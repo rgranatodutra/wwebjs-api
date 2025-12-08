@@ -10,21 +10,22 @@ import makeWASocket, {
 } from "baileys";
 import type { ILogger } from "baileys/lib/Utils/logger";
 import QRCode from "qrcode";
-import type StorageClient from "../../storage/storage-client";
-import ProcessingLogger from "../../utils/processing-logger";
-import type MessageDto from "../types";
-import type { EditMessageOptions, SendMessageOptions } from "../types";
-import type WhatsappClient from "../whatsapp-client";
-import handleMessageUpsert from "./handle-message-upsert";
+import ProcessingLogger from "../../../../utils/processing-logger";
+import type DataClient from "../../../data/data-client";
+import type MessageDto from "../../types";
+import type { EditMessageOptions, SendMessageOptions } from "../../types";
+import WhatsappClient from "../whatsapp-client";
 import handleMessageUpdate from "./handle-message-update";
+import handleMessageUpsert from "./handle-message-upsert";
 
 class BaileysWhatsappClient implements WhatsappClient {
   private _phone: string = "";
+  
   constructor(
     public readonly sessionId: string,
     public readonly clientId: number,
     public readonly instance: string,
-    public readonly _storage: StorageClient,
+    public readonly _storage: DataClient,
     private _sock: ReturnType<typeof makeWASocket>,
   ) {}
 
@@ -32,7 +33,7 @@ class BaileysWhatsappClient implements WhatsappClient {
     sessionId: string,
     clientId: number,
     instance: string,
-    storage: StorageClient,
+    storage: DataClient,
   ): Promise<BaileysWhatsappClient> {
     const socket = await BaileysWhatsappClient.makeNewSocket(sessionId, storage);
 
@@ -41,7 +42,7 @@ class BaileysWhatsappClient implements WhatsappClient {
     return client;
   }
 
-  private static async makeNewSocket(id: string, storage: StorageClient) {
+  private static async makeNewSocket(id: string, storage: DataClient) {
     const logger: ILogger = {
       level: "info",
       error: (msg) => console.log(`[ERROR] ${msg}`),

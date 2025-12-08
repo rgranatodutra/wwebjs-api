@@ -1,4 +1,4 @@
-import { MessageStatus } from "../types";
+import { MessageStatus } from "../../types";
 
 const ACKS_DICT: Array<MessageStatus> = ["ERROR", "PENDING", "SENT", "RECEIVED", "READ", "READ"];
 

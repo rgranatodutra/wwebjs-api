@@ -10,12 +10,12 @@ import type { ILogger } from "baileys/lib/Utils/logger.js";
 import { useMySQLAuthState } from "mysql-baileys";
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { createPool } from "mysql2/promise";
-import type StorageClient from "./storage-client.js";
+import type DataClient from "./data-client.js";
 import { Logger } from "@in.pulse-crm/utils";
 
 type MySQLAuthState = Awaited<ReturnType<typeof useMySQLAuthState>>;
 
-class MySQLStorageClient implements StorageClient {
+class MySQLDataClient implements DataClient {
   private pool: Pool;
   private mysqlAuthStateMap: Map<string, MySQLAuthState> = new Map();
 
@@ -123,4 +123,4 @@ class MySQLStorageClient implements StorageClient {
   }
 }
 
-export default MySQLStorageClient;
+export default MySQLDataClient;

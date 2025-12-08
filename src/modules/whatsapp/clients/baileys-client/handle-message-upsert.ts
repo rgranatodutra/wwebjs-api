@@ -1,7 +1,7 @@
 import { MessageUpsertType, WAMessage } from "baileys";
 
 import BaileysWhatsappClient from "./baileys-whatsapp-client";
-import ProcessingLogger from "../../utils/processing-logger";
+import ProcessingLogger from "../../../../utils/processing-logger";
 import parseMessage from "./parse-message";
 
 interface MessageUpsertContext {
