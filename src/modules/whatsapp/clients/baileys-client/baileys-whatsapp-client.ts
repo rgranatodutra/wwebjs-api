@@ -1,4 +1,3 @@
-import { Logger } from "@in.pulse-crm/utils";
 import makeWASocket, {
   Browsers,
   DisconnectReason,
@@ -9,9 +8,9 @@ import makeWASocket, {
   type ConnectionState,
 } from "baileys";
 import type { ILogger } from "baileys/lib/Utils/logger";
-import QRCode from "qrcode";
 import ProcessingLogger from "../../../../utils/processing-logger";
 import type DataClient from "../../../data/data-client";
+import WppEventEmitter from "../../../events/emitter/emitter";
 import type MessageDto from "../../types";
 import type { EditMessageOptions, SendMessageOptions } from "../../types";
 import WhatsappClient from "../whatsapp-client";
@@ -20,13 +19,14 @@ import handleMessageUpsert from "./handle-message-upsert";
 
 class BaileysWhatsappClient implements WhatsappClient {
   private _phone: string = "";
-  
+
   constructor(
     public readonly sessionId: string,
     public readonly clientId: number,
     public readonly instance: string,
     public readonly _storage: DataClient,
     private _sock: ReturnType<typeof makeWASocket>,
+    public _ev: WppEventEmitter,
   ) {}
 
   public static async build(
@@ -34,10 +34,11 @@ class BaileysWhatsappClient implements WhatsappClient {
     clientId: number,
     instance: string,
     storage: DataClient,
+    eventEmitter: WppEventEmitter,
   ): Promise<BaileysWhatsappClient> {
     const socket = await BaileysWhatsappClient.makeNewSocket(sessionId, storage);
 
-    const client = new BaileysWhatsappClient(sessionId, clientId, instance, storage, socket);
+    const client = new BaileysWhatsappClient(sessionId, clientId, instance, storage, socket, eventEmitter);
     client.bindEvents();
     return client;
   }
@@ -86,14 +87,15 @@ class BaileysWhatsappClient implements WhatsappClient {
 
   private async onConnectionUpdate(update: Partial<ConnectionState>) {
     const logger = this.getLogger("Connection Update", `conn-update-${Date.now()}`, update);
-    Logger.info("Connection update received:");
-    console.dir(update, { depth: null });
-
     logger?.log("Connection update received", update);
 
     if (update.qr) {
-      const qrString = await QRCode.toString(update.qr, { type: "terminal" });
-      console.log(qrString);
+      this._ev.emit({
+        type: "qr-received",
+        clientId: this.clientId,
+        qr: update.qr,
+      });
+
       logger?.log("QR code generated for connection");
     }
 
@@ -103,21 +105,26 @@ class BaileysWhatsappClient implements WhatsappClient {
       const sevenDaysAgo = new Date(Date.now() - sevenDays);
       this._sock.fetchMessageHistory(10, {}, sevenDaysAgo.getTime());
       this._phone = this._sock.user?.id.split(":")[0] || "";
+
+      this._ev.emit({
+        type: "auth-success",
+        clientId: this.clientId,
+        phoneNumber: this._phone,
+      });
     }
 
-    if (
-      update.connection === "close" &&
-      (update.lastDisconnect?.error as any)?.output?.statusCode === DisconnectReason.restartRequired
-    ) {
+    const errStatusCode = (update.lastDisconnect?.error as any)?.output?.statusCode;
+    const isRestartRequired = errStatusCode === DisconnectReason.restartRequired;
+
+    if (update.connection === "close" && isRestartRequired) {
       logger?.log("Socket restart required, reinitializing...");
       this._sock = await BaileysWhatsappClient.makeNewSocket(this.sessionId, this._storage);
       this.bindEvents();
       logger?.log("Socket reinitialized successfully");
-    } else if (update.connection === "close") {
+    }
+    if (update.connection === "close" && !isRestartRequired) {
       this._storage.clearAuthState(this.sessionId);
       logger?.log("Logged out, cleared auth state from storage");
-      // Additional handling for logged out state can be added here
-      // Reconnect
       this._sock = await BaileysWhatsappClient.makeNewSocket(this.sessionId, this._storage);
       this.bindEvents();
       logger?.log("Socket reinitialized after logout");
