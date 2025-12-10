@@ -57,7 +57,16 @@ async function handleSendMessage({ client, options, isGroup, logger }: SendMessa
       });
 
       logger.debug(`Simulando digitação por ${typingDuration}ms`);
+
+      // Enviar estado de digitação
+      await client._sock.sendPresenceUpdate("composing", jid);
+      logger.debug(`Estado de digitação enviado para: ${jid}`);
+
       await sleep(typingDuration);
+
+      // Parar de enviar estado de digitação
+      await client._sock.sendPresenceUpdate("paused", jid);
+      logger.debug(`Estado de pausa enviado para: ${jid}`);
     }
 
     const message = await client._sock.sendMessage(jid, messageOptions);
