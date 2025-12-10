@@ -1,10 +1,11 @@
+import { Logger } from "@in.pulse-crm/utils";
 import { AnyMediaMessageContent, AnyRegularMessageContent, jidNormalizedUser } from "baileys";
+import { phoneToAltBr } from "../../../../utils/phone.utils";
+import ProcessingLogger from "../../../../utils/processing-logger";
+import { calculateTypingDuration, sleep } from "../../../../utils/humanize.utils";
 import { SendFileOptions, SendMessageOptions } from "../../types";
 import BaileysWhatsappClient from "./baileys-whatsapp-client";
 import parseMessage from "./parse-message";
-import { phoneToAltBr } from "../../../../utils/phone.utils";
-import ProcessingLogger from "../../../../utils/processing-logger";
-import { Logger } from "@in.pulse-crm/utils";
 
 interface SendMessageContext {
   client: BaileysWhatsappClient;
@@ -44,6 +45,20 @@ async function handleSendMessage({ client, options, isGroup, logger }: SendMessa
 
     const messageOptions = getMessageOptions(options);
     logger.debug(`Opções de mensagem preparadas`, { isGroup });
+
+    // Simular digitação para humanizar a interação
+    const messageText = options.text || "";
+
+    if (messageText) {
+      const typingDuration = calculateTypingDuration({
+        messageLength: messageText.length,
+        minSpeed: 30, // ms por caractere
+        maxSpeed: 60, // ms por caractere
+      });
+
+      logger.debug(`Simulando digitação por ${typingDuration}ms`);
+      await sleep(typingDuration);
+    }
 
     const message = await client._sock.sendMessage(jid, messageOptions);
 
