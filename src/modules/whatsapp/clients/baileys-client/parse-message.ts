@@ -33,7 +33,8 @@ interface FileMessageContent extends MessageContent {
 async function parseMessage({ message, instance, clientId, phone }: ParseMessageParams): Promise<MessageDto> {
   const { isFile, contactName, quotedMessageId, ...content } = getMessageContent(message);
 
-  const messageSentAt = new Date(Number(content.timestamp.padEnd(13, "0")));
+  // Baileys retorna timestamp em segundos, precisamos converter para milissegundos
+  const messageSentAt = new Date(Number(content.timestamp) * 1000);
   const isFromMe = message.key.fromMe;
   const remotePhone = getMessageFrom(message.key);
   const isForwarded = getIsForwarded(message);
@@ -65,7 +66,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
   Logger.debug("Getting message content", message);
   const messageBase: BaseMessageContent = {
     contactName: getMessageContactName(message),
-    timestamp: String(message.messageTimestamp),
+    timestamp: String(message.messageTimestamp).padEnd(13, "0"),
     quotedMessageId: getMessageQuotedId(message),
   };
 
