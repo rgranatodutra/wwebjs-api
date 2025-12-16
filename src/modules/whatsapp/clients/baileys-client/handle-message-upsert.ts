@@ -20,6 +20,24 @@ async function handleMessageUpsert({ messages, type, client, logger }: MessageUp
       continue;
     }
 
+    // Ignorar mensagens de broadcast (terminam com @broadcast)
+    if (message.key.remoteJid?.endsWith("@broadcast")) {
+      logger.log("Skipping broadcast message", { messageId: message.key?.id });
+      continue;
+    }
+
+    // Ignorar mensagens de newsletter (terminam com @newsletter)
+    if (message.key.remoteJid?.endsWith("@newsletter")) {
+      logger.log("Skipping newsletter message", { messageId: message.key?.id });
+      continue;
+    }
+
+    // Ignorar mensagens de status (status@broadcast)
+    if (message.key.remoteJid === "status@broadcast") {
+      logger.log("Skipping status message", { messageId: message.key?.id });
+      continue;
+    }
+
     if (message.message) {
       logger.log("Saving raw message to storage", { messageId: message.key?.id });
       await client._storage.saveRawMessage(client.sessionId, message.message, message.key);
