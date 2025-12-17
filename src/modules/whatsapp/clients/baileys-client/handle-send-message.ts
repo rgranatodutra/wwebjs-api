@@ -43,7 +43,7 @@ async function handleSendMessage({ client, options, isGroup, logger }: SendMessa
       throw new Error(`Failed to normalize JID for phone: ${options.to}`);
     }
 
-    const messageOptions = getMessageOptions(options);
+    const messageOptions = getMessageOptions(options, logger);
     logger.debug(`Opções de mensagem preparadas`, { isGroup });
 
     // Simular digitação para humanizar a interação
@@ -97,44 +97,53 @@ async function handleSendMessage({ client, options, isGroup, logger }: SendMessa
   }
 }
 
-function getMessageOptions(options: SendMessageOptions): AnyRegularMessageContent {
+function getMessageOptions(options: SendMessageOptions, logger: ProcessingLogger): AnyRegularMessageContent {
+  logger.debug(`Preparando opções de mensagem`);
   const isFileMessage = "fileUrl" in options;
+  logger.debug(`Tipo de mensagem: ${isFileMessage ? "arquivo" : "texto"}`);
 
   if (isFileMessage) {
-    return getFileMessageOptions(options as SendFileOptions);
+    logger.debug(`Processando mensagem de arquivo`);
+    return getFileMessageOptions(options as SendFileOptions, logger);
   }
   if (!options.text) {
     throw new Error("Text message must have 'text' property");
   }
+  logger.debug(`Criando mensagem de texto: ${options.text.substring(0, 50)}...`);
   return {
     text: options.text || "",
   };
 }
 
-function getFileMessageOptions(options: SendFileOptions): AnyMediaMessageContent {
+function getFileMessageOptions(options: SendFileOptions, logger: ProcessingLogger): AnyMediaMessageContent {
+  logger.debug(`Preparando opções de arquivo`, { fileType: options.fileType, fileName: options.fileName });
   const isImage = options.fileType?.includes("image");
   const isVideo = options.fileType?.includes("video");
   const isAudio = options.fileType?.includes("audio");
 
   if (isImage) {
+    logger.debug(`Criando mensagem de imagem`, { url: options.fileUrl });
     return {
       image: { url: options.fileUrl },
       ...(options.text ? { caption: options.text } : {}),
     };
   }
   if (isVideo) {
+    logger.debug(`Criando mensagem de vídeo`, { url: options.fileUrl });
     return {
       video: { url: options.fileUrl },
       ...(options.text ? { caption: options.text } : {}),
     };
   }
   if (isAudio) {
+    logger.debug(`Criando mensagem de áudio`, { url: options.fileUrl });
     return {
       audio: { url: options.fileUrl },
       ...(options.text ? { caption: options.text } : {}),
     };
   }
 
+  logger.debug(`Criando mensagem de documento`, { fileName: options.fileName, mimeType: options.fileType });
   return {
     document: {
       url: options.fileUrl,
