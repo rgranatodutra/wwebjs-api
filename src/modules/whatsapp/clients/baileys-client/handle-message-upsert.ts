@@ -49,6 +49,7 @@ async function handleMessageUpsert({ messages, type, client, logger }: MessageUp
         instance: client.instance,
         clientId: client.clientId,
         phone: client.phone,
+        logger,
       });
 
       logger.log("Message parsed successfully", { parsedMessage });

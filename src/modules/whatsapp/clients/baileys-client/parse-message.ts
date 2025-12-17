@@ -1,8 +1,8 @@
-import { downloadMediaMessage, WAMessage, WAMessageKey } from "baileys";
-import MessageDto from "../../types";
-import filesService from "../../../files/files.service";
 import { FileDirType } from "@in.pulse-crm/sdk";
-import { Logger } from "@in.pulse-crm/utils";
+import { downloadMediaMessage, WAMessage, WAMessageKey } from "baileys";
+import ProcessingLogger from "../../../../utils/processing-logger";
+import filesService from "../../../files/files.service";
+import MessageDto from "../../types";
 
 type MessageType = "chat" | "image" | "video" | "audio" | "document" | "sticker" | "unsupported";
 interface ParseMessageParams {
@@ -10,6 +10,7 @@ interface ParseMessageParams {
   instance: string;
   clientId: number;
   phone: string;
+  logger: ProcessingLogger;
 }
 
 interface BaseMessageContent {
@@ -30,14 +31,20 @@ interface FileMessageContent extends MessageContent {
   isFile: true;
 }
 
-async function parseMessage({ message, instance, clientId, phone }: ParseMessageParams): Promise<MessageDto> {
-  const { isFile, contactName, quotedMessageId, ...content } = getMessageContent(message);
+async function parseMessage({ message, instance, clientId, phone, logger }: ParseMessageParams): Promise<MessageDto> {
+  logger.debug("Parsing message", message);
+  const { isFile, contactName, quotedMessageId, ...content } = getMessageContent(message, logger);
 
   // Baileys retorna timestamp em segundos, precisamos converter para milissegundos
   const messageSentAt = new Date(Number(content.timestamp) * 1000);
   const isFromMe = message.key.fromMe;
+
+  logger.debug("Verifying message sender info");
   const remotePhone = getMessageFrom(message.key);
+  logger.debug("Message sender phone", remotePhone);
+  logger.debug("Verifying if message is forwarded");
   const isForwarded = getIsForwarded(message);
+  logger.debug("Is message forwarded", isForwarded);
 
   const parsedMessage: MessageDto = {
     instance,
@@ -50,27 +57,30 @@ async function parseMessage({ message, instance, clientId, phone }: ParseMessage
     sentAt: messageSentAt,
     ...content,
   };
-
-  Logger.debug("Parsed message", parsedMessage);
+  logger.debug("Base parsed message", parsedMessage);
 
   if (isFile) {
-    const uploadedFile = await processMediaFile(instance, message, content as FileMessageContent);
-
+    logger.debug("Processing file message", { fileName: (content as FileMessageContent).fileName });
+    const uploadedFile = await processMediaFile(instance, message, content as FileMessageContent, logger);
+    logger.debug("Uploaded file", uploadedFile);
     return { ...parsedMessage, fileId: uploadedFile.id };
   }
 
   return parsedMessage;
 }
 
-function getMessageContent(message: WAMessage): MessageContent | FileMessageContent {
-  Logger.debug("Getting message content", message);
+function getMessageContent(message: WAMessage, logger: ProcessingLogger): MessageContent | FileMessageContent {
+  logger.debug("Getting message content", message);
   const messageBase: BaseMessageContent = {
     contactName: getMessageContactName(message),
     timestamp: String(message.messageTimestamp).padEnd(13, "0"),
     quotedMessageId: getMessageQuotedId(message),
   };
 
+  logger.debug("Message base content", messageBase);
+
   if (message.message?.extendedTextMessage?.text) {
+    logger.debug("Message is extended text message");
     return {
       ...messageBase,
       type: "chat",
@@ -80,6 +90,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
   }
 
   if (message.message?.conversation) {
+    logger.debug("Message is conversation text message");
     return {
       ...messageBase,
       type: "chat",
@@ -88,6 +99,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
     };
   }
   if (message.message?.audioMessage) {
+    logger.debug("Message is audio message");
     return {
       ...messageBase,
       body: message.message.conversation || "",
@@ -99,6 +111,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
     };
   }
   if (message.message?.imageMessage) {
+    logger.debug("Message is image message");
     return {
       ...messageBase,
       body: message.message.imageMessage?.caption || "",
@@ -110,6 +123,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
     };
   }
   if (message.message?.videoMessage) {
+    logger.debug("Message is video message");
     return {
       ...messageBase,
       body: message.message.videoMessage?.caption || "",
@@ -121,6 +135,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
     };
   }
   if (message.message?.documentMessage) {
+    logger.debug("Message is document message");
     return {
       ...messageBase,
       body: message.message.documentMessage?.caption || "",
@@ -132,6 +147,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
     };
   }
   if (message.message?.stickerMessage) {
+    logger.debug("Message is sticker message");
     return {
       ...messageBase,
       body: "",
@@ -143,6 +159,7 @@ function getMessageContent(message: WAMessage): MessageContent | FileMessageCont
     };
   }
 
+  logger.debug("Message type is unsupported");
   return {
     ...messageBase,
     type: "unsupported",
@@ -180,12 +197,12 @@ function getMessageQuotedId(message: WAMessage): string | null {
   return message.message?.extendedTextMessage?.contextInfo?.stanzaId || null;
 }
 
-async function processMediaFile(instance: string, message: WAMessage, content: FileMessageContent) {
-  Logger.debug("Downloading media message", { fileName: content.fileName, fileSize: content.fileSize });
+async function processMediaFile(instance: string, message: WAMessage, content: FileMessageContent, logger: ProcessingLogger) {
+  logger.debug("Downloading media message", { fileName: content.fileName, fileSize: content.fileSize });
 
   const mediaBuffer = await downloadMediaMessage(message, "buffer", {});
 
-  Logger.debug("Media downloaded, uploading to storage", { bufferSize: mediaBuffer.length });
+  logger.debug("Media downloaded, uploading to storage", { bufferSize: mediaBuffer.length });
 
   const uploadedFile = await filesService.uploadFile({
     buffer: mediaBuffer,
@@ -194,6 +211,8 @@ async function processMediaFile(instance: string, message: WAMessage, content: F
     dirType: FileDirType.PUBLIC,
     instance,
   });
+
+  logger.debug("Media uploaded", { fileId: uploadedFile.id });
 
   return uploadedFile;
 }

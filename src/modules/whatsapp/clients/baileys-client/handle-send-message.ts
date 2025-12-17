@@ -82,6 +82,7 @@ async function handleSendMessage({ client, options, isGroup, logger }: SendMessa
       instance: client.instance,
       clientId: client.clientId,
       phone: client.phone,
+      logger,
     });
 
     Logger.debug("Mensagem parseada com sucesso", parsedMessage);
