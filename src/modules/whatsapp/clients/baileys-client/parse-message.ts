@@ -16,6 +16,7 @@ interface ParseMessageParams {
 interface BaseMessageContent {
   contactName: string;
   timestamp: string;
+  sentAt: Date;
   quotedMessageId?: string | null;
 }
 interface MessageContent extends BaseMessageContent {
@@ -35,8 +36,6 @@ async function parseMessage({ message, instance, clientId, phone, logger }: Pars
   logger.debug("Parsing message", message);
   const { isFile, contactName, quotedMessageId, ...content } = getMessageContent(message, logger);
 
-  // Baileys retorna timestamp em segundos, precisamos converter para milissegundos
-  const messageSentAt = new Date(Number(content.timestamp) * 1000);
   const isFromMe = message.key.fromMe;
 
   logger.debug("Verifying message sender info");
@@ -54,7 +53,6 @@ async function parseMessage({ message, instance, clientId, phone, logger }: Pars
     to: isFromMe ? remotePhone : `me:${phone}`,
     isForwarded,
     status: isFromMe ? "PENDING" : "RECEIVED",
-    sentAt: messageSentAt,
     ...content,
   };
   logger.debug("Base parsed message", parsedMessage);
@@ -71,10 +69,13 @@ async function parseMessage({ message, instance, clientId, phone, logger }: Pars
 
 function getMessageContent(message: WAMessage, logger: ProcessingLogger): MessageContent | FileMessageContent {
   logger.debug("Getting message content", message);
+  const timestamp = String(message.messageTimestamp).padEnd(13, "0")
+  const sentAt = new Date(Number(timestamp));
   const messageBase: BaseMessageContent = {
     contactName: getMessageContactName(message),
-    timestamp: String(message.messageTimestamp).padEnd(13, "0"),
+    timestamp,
     quotedMessageId: getMessageQuotedId(message),
+    sentAt,
   };
 
   logger.debug("Message base content", messageBase);
