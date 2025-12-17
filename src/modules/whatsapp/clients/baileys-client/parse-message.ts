@@ -204,17 +204,24 @@ async function processMediaFile(instance: string, message: WAMessage, content: F
 
   logger.debug("Media downloaded, uploading to storage", { bufferSize: mediaBuffer.length });
 
-  const uploadedFile = await filesService.uploadFile({
-    buffer: mediaBuffer,
-    fileName: content.fileName,
-    mimeType: content.fileType,
-    dirType: FileDirType.PUBLIC,
-    instance,
-  });
+  try {
+    const uploadedFile = await filesService.uploadFile({
+      buffer: mediaBuffer,
+      fileName: content.fileName,
+      mimeType: content.fileType,
+      dirType: FileDirType.PUBLIC,
+      instance,
+    });
 
-  logger.debug("Media uploaded", { fileId: uploadedFile.id });
+    logger.debug("Media uploaded", { fileId: uploadedFile.id });
 
-  return uploadedFile;
+    return uploadedFile;
+  } catch (err) {
+    logger.debug("Error uploading media file", err);
+    throw new Error("Failed to upload media file");
+  }
+
+
 }
 
 export default parseMessage;
