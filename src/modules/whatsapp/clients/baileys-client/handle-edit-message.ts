@@ -65,6 +65,7 @@ async function handleEditMessage({ client, options, logger }: EditMessageContext
     instance: client.instance,
     clientId: client.clientId,
     phone: client.phone,
+    logger
   });
   logger.success(`Parsed edited message for message ID ${options.messageId} successfully`);
   return parsedMessage;
